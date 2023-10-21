@@ -6,6 +6,7 @@ use crate::input::layout::{RunPlugin, SplitSize};
 use crate::pane_size::PaneGeom;
 use crate::shared::{colors as default_colors, eightbit_to_rgb};
 use clap::ArgEnum;
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
@@ -1037,7 +1038,7 @@ impl PluginPermission {
     EnumIter,
     Serialize,
     Deserialize,
-    ArgEnum,
+    ValueEnum,
     PartialOrd,
     Ord,
 )]

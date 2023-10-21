@@ -343,7 +343,7 @@ impl<'a> PluginLoader<'a> {
         keybinds: Keybinds,
     ) -> Result<Self> {
         let plugin_own_data_dir = ZELLIJ_SESSION_CACHE_DIR
-            .join(Url::from(&plugin.location).to_string())
+            .join(Url::from(&plugin.location).to_string().replace(":", "_"))
             .join(format!("{}-{}", plugin_id, client_id));
         let plugin_own_cache_dir = ZELLIJ_SESSION_CACHE_DIR
             .join(Url::from(&plugin.location).to_string())

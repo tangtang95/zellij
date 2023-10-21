@@ -4,16 +4,17 @@ use crate::{
     thread_bus::ThreadSenders,
 };
 use async_std::task;
-use std::{
-    os::unix::io::RawFd,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
+#[cfg(unix)]
+use std::os::unix::io::RawFd;
+
 use zellij_utils::{
     errors::{get_current_ctx, prelude::*, ContextType},
     logging::debug_to_file,
 };
 
 pub(crate) struct TerminalBytes {
+    #[cfg(unix)]
     pid: RawFd,
     terminal_id: u32,
     senders: ThreadSenders,
@@ -23,18 +24,29 @@ pub(crate) struct TerminalBytes {
 
 impl TerminalBytes {
     pub fn new(
-        pid: RawFd,
+        #[cfg(unix)] pid: RawFd,
         senders: ThreadSenders,
         os_input: Box<dyn ServerOsApi>,
         debug: bool,
         terminal_id: u32,
     ) -> Self {
+        #[cfg(unix)]
+        let async_reader = os_input.async_file_reader(pid);
+        #[cfg(windows)]
+        let async_reader = os_input.async_file_reader(terminal_id);
+
         TerminalBytes {
+            #[cfg(unix)]
             pid,
             terminal_id,
             senders,
             debug,
             async_reader: os_input.async_file_reader(pid),
+            render_deadline: None,
+            backed_up: false,
+            minimum_render_send_time: None,
+            buffering_pause: Duration::from_millis(30),
+            last_render: Instant::now(),
         }
     }
     pub async fn listen(&mut self) -> Result<()> {
@@ -55,16 +67,29 @@ impl TerminalBytes {
         err_ctx.add_call(ContextType::AsyncTask);
         let mut buf = [0u8; 65536];
         loop {
-            match self.async_reader.read(&mut buf).await {
-                Ok(0) => break, // EOF
-                Err(err) => {
-                    log::error!("{}", err);
+            match self.deadline_read(&mut buf).await {
+                ReadResult::Ok(0) => continue,
+                ReadResult::Err(_) => {
+                    log::info!("reached EoF");
                     break;
+                }, // EOF or error
+                ReadResult::Timeout => {
+                    let time_to_send_render = self
+                        .async_send_to_screen(ScreenInstruction::Render)
+                        .await
+                        .with_context(err_context)?;
+                    self.update_render_send_time(time_to_send_render);
+                    // next read does not need a deadline as we just rendered everything
+                    self.render_deadline = None;
+                    self.last_render = Instant::now();
                 },
                 Ok(n_bytes) => {
                     let bytes = &buf[..n_bytes];
                     if self.debug {
+                        #[cfg(unix)]
                         let _ = debug_to_file(bytes, self.pid);
+                        #[cfg(windows)]
+                        let _ = debug_to_file(bytes);
                     }
                     self.async_send_to_screen(ScreenInstruction::PtyBytes(
                         self.terminal_id,

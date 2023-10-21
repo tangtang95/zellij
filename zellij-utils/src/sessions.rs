@@ -11,6 +11,11 @@ use anyhow;
 use humantime::format_duration;
 use interprocess::local_socket::LocalSocketStream;
 use std::collections::HashMap;
+use std::fs::DirEntry;
+use std::iter::empty;
+use suggest::Suggest;
+use std::collections::HashMap;
+#[cfg(unix)]
 use std::os::unix::fs::FileTypeExt;
 use std::time::{Duration, SystemTime};
 use std::{fs, io, process};
@@ -33,12 +38,42 @@ pub fn get_sessions() -> Result<Vec<(String, Duration)>, io::ErrorKind> {
                         sessions.push((file_name, duration));
                     }
                 }
+                // TODO windows
             });
             Ok(sessions)
         },
-        Err(err) if io::ErrorKind::NotFound != err.kind() => Err(err.kind()),
-        Err(_) => Ok(Vec::with_capacity(0)),
+        Err(err) => Err(err.kind()),
     }
+}
+
+fn iter_sessions() -> Result<Box<dyn Iterator<Item = DirEntry>>, io::Error> {
+    #[cfg(windows)]
+    {
+        use std::path::PathBuf;
+
+        let path = PathBuf::from("\\\\.\\pipe\\");
+        match fs::read_dir(path) {
+            Ok(pipes) => Ok(Box::new(
+                pipes
+                    .map(|file| file.unwrap())
+                    .filter(|file| file.path().starts_with(&*ZELLIJ_SOCK_DIR)),
+            )),
+            Err(err) if io::ErrorKind::NotFound != err.kind() => Err(err),
+            Err(_) => Ok(Box::new(empty())),
+        }
+    }
+    #[cfg(unix)]
+    {
+        match fs::read_dir(&*ZELLIJ_SOCK_DIR) {
+            Ok(files) => Ok(files.map(|file| file.unwrap())),
+            Err(err) if io::ErrorKind::NotFound != err.kind() => Err(err),
+            Err(_) => Ok(empty()),
+        }
+    }
+}
+
+fn is_socket(file: &DirEntry) -> io::Result<bool> {
+    zellij_utils::is_socket(file)
 }
 
 pub fn get_resurrectable_sessions() -> Vec<(String, Duration)> {
@@ -51,6 +86,17 @@ pub fn get_resurrectable_sessions() -> Vec<(String, Duration)> {
                 .filter_map(|folder_name| {
                     let layout_file_name =
                         session_layout_cache_file_name(&folder_name.display().to_string());
+                    let raw_layout = match std::fs::read_to_string(&layout_file_name) {
+                        Ok(raw_layout) => raw_layout,
+                        Err(e) => {
+                            log::error!(
+                                "Failed to read resurrection layout file: {:?} at {:?}",
+                                e,
+                                &layout_file_name
+                            );
+                            return None;
+                        },
+                    };
                     let ctime = match std::fs::metadata(&layout_file_name)
                         .and_then(|metadata| metadata.created())
                     {
@@ -116,10 +162,10 @@ pub fn get_sessions_sorted_by_mtime() -> anyhow::Result<Vec<String>> {
         Ok(files) => {
             let mut sessions_with_mtime: Vec<(String, SystemTime)> = Vec::new();
             for file in files {
-                let file = file?;
+                let file = file;
                 let file_name = file.file_name().into_string().unwrap();
                 let file_modified_at = file.metadata()?.modified()?;
-                if file.file_type()?.is_socket() && assert_socket(&file_name) {
+                if is_socket(&file)? && assert_socket(&file_name) {
                     sessions_with_mtime.push((file_name, file_modified_at));
                 }
             }
@@ -135,11 +181,15 @@ pub fn get_sessions_sorted_by_mtime() -> anyhow::Result<Vec<String>> {
 
 fn assert_socket(name: &str) -> bool {
     let path = &*ZELLIJ_SOCK_DIR.join(name);
-    match LocalSocketStream::connect(path) {
+    match IpcSocketStream::connect(path) {
         Ok(stream) => {
-            let mut sender = IpcSenderWithContext::new(stream);
+            let mut receiver = IpcReceiverWithContext::new(stream);
+            let mut sender = receiver.get_sender();
+            sender
+                .send(ClientToServerMsg::ConnStatus)
+                .with_context(|| "Query connection status")
+                .non_fatal();
             let _ = sender.send(ClientToServerMsg::ConnStatus);
-            let mut receiver: IpcReceiverWithContext<ServerToClientMsg> = sender.get_receiver();
             match receiver.recv() {
                 Some((ServerToClientMsg::Connected, _)) => true,
                 None | Some((_, _)) => false,
@@ -236,7 +286,7 @@ pub fn get_active_session() -> ActiveSession {
 
 pub fn kill_session(name: &str) {
     let path = &*ZELLIJ_SOCK_DIR.join(name);
-    match LocalSocketStream::connect(path) {
+    match IpcSocketStream::connect(path) {
         Ok(stream) => {
             let _ = IpcSenderWithContext::new(stream).send(ClientToServerMsg::KillSession);
         },
@@ -250,7 +300,7 @@ pub fn kill_session(name: &str) {
 pub fn delete_session(name: &str, force: bool) {
     if force {
         let path = &*ZELLIJ_SOCK_DIR.join(name);
-        let _ = LocalSocketStream::connect(path).map(|stream| {
+        let _ = IpcSocketStream::connect(path).map(|stream| {
             IpcSenderWithContext::new(stream)
                 .send(ClientToServerMsg::KillSession)
                 .ok();
