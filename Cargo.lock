@@ -6041,6 +6041,7 @@ dependencies = [
  "url",
  "uuid",
  "winapi",
+ "winpty-rs",
 ]
 
 [[package]]

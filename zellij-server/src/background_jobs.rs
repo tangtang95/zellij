@@ -11,10 +11,6 @@ use isahc::prelude::*;
 use isahc::AsyncReadResponseExt;
 use isahc::{config::RedirectPolicy, HttpClient, Request};
 use zellij_utils::is_socket;
-use zellij_utils::surf::{
-    http::{Method, Url},
-    RequestBuilder,
-};
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs;

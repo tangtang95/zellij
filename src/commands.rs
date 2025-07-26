@@ -3,6 +3,7 @@ use std::net::IpAddr;
 use std::{fs::File, io::prelude::*, path::PathBuf, process, time::Duration};
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 use isahc::{config::RedirectPolicy, prelude::*, HttpClient, Request};
 
 use nix;
@@ -22,12 +23,15 @@ use zellij_utils::sessions::{
 };
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 use zellij_client::web_client::start_web_client as start_web_client_impl;
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 use zellij_utils::web_server_commands::shutdown_all_webserver_instances;
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 use zellij_utils::web_authentication_tokens::{
     create_token, list_tokens, revoke_all_tokens, revoke_token,
 };
@@ -174,6 +178,7 @@ pub(crate) fn start_server(path: PathBuf, debug: bool) {
 }
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub(crate) fn start_web_server(
     opts: CliArgs,
     run_daemonized: bool,
@@ -231,6 +236,7 @@ fn create_new_client() -> ClientInfo {
 }
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub(crate) fn stop_web_server() -> Result<(), String> {
     shutdown_all_webserver_instances().map_err(|e| e.to_string())?;
     Ok(())
@@ -248,6 +254,7 @@ pub(crate) fn stop_web_server() -> Result<(), String> {
 }
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub(crate) fn create_auth_token() -> Result<String, String> {
     // returns the token and it's name
     create_token(None)
@@ -267,6 +274,7 @@ pub(crate) fn create_auth_token() -> Result<String, String> {
 }
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub(crate) fn revoke_auth_token(token_name: &str) -> Result<bool, String> {
     revoke_token(token_name).map_err(|e| e.to_string())
 }
@@ -283,6 +291,7 @@ pub(crate) fn revoke_auth_token(_token_name: &str) -> Result<bool, String> {
 }
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub(crate) fn revoke_all_auth_tokens() -> Result<usize, String> {
     // returns the revoked count
     revoke_all_tokens().map_err(|e| e.to_string())
@@ -300,6 +309,7 @@ pub(crate) fn revoke_all_auth_tokens() -> Result<usize, String> {
 }
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub(crate) fn list_auth_tokens() -> Result<Vec<String>, String> {
     // returns the token list line by line
     list_tokens()
@@ -325,6 +335,7 @@ pub(crate) fn list_auth_tokens() -> Result<Vec<String>, String> {
 }
 
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub(crate) fn web_server_status(web_server_base_url: &str) -> Result<String, String> {
     let http_client = HttpClient::builder()
         // TODO: timeout?

@@ -11,17 +11,14 @@ use signal_hook::consts::*;
 use sysinfo::{ProcessExt, ProcessRefreshKind, System, SystemExt};
 use tempfile::tempfile;
 use zellij_utils::{
-    channels,
-    channels::TrySendError,
-    data::Palette,
-    errors::prelude::*,
-    input::command::{RunCommand, TerminalAction},
-    ipc::{
+    channels::{self, TrySendError}, data::Palette, errors::prelude::*, input::command::{RunCommand, TerminalAction}, ipc::{
         ClientToServerMsg, ExitReason, IpcReceiverWithContext, IpcSenderWithContext,
         IpcSocketStream, ServerToClientMsg,
-    },
-    shared::default_palette,
+    }, shared::default_palette
 };
+
+#[cfg(windows)]
+use zellij_utils::logging::WinPtyReference;
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -56,9 +53,11 @@ use zellij_utils::{libc, nix};
 #[cfg(windows)]
 use std::thread;
 #[cfg(windows)]
-pub use sysinfo::{Pid, Signal, System};
+pub use sysinfo::{Pid, Signal};
 #[cfg(windows)]
 use winptyrs::{AgentConfig, PTYArgs, PTY};
+#[cfg(windows)]
+use std::io::Error;
 
 #[cfg(unix)]
 fn set_terminal_size_using_fd(
@@ -279,6 +278,8 @@ fn handle_terminal(
     quit_cb: Box<dyn Fn(PaneId, Option<i32>, RunCommand) + Send>,
     terminal_id: u32,
 ) -> Result<Arc<RwLock<PTY>>> {
+    use std::ffi::OsString;
+
     let err_context = || "failed to spawn terminal";
 
     let pty_args = PTYArgs {
@@ -543,7 +544,6 @@ impl ClientSender {
             channels::bounded::<ServerToClientMsg>(5000);
         std::thread::spawn(move || {
             for msg in client_buffer_receiver.iter() {
-                log::debug!("transmit message {} to client", msg);
                 sender
                     .send(msg.clone())
                     .with_context(|| {
@@ -580,14 +580,6 @@ impl ClientSender {
             .with_context(err_context)
     }
 }
-
-#[cfg(windows)]
-#[derive(Clone)]
-pub struct WinPtyReference {
-    pub pty: Arc<RwLock<PTY>>,
-}
-
-impl WinPtyReference {}
 
 #[cfg(unix)]
 type TerminalReference = RawFd;
@@ -917,7 +909,7 @@ impl ServerOsApi for ServerOsInputOutput {
         let err_context = || "failed to reserve a terminal ID".to_string();
 
         let terminal_id = self
-            .terminal_id_to_raw_fd
+            .terminal_id_to_reference
             .lock()
             .to_anyhow()
             .with_context(err_context)?
@@ -1075,7 +1067,6 @@ impl ServerOsApi for ServerOsInputOutput {
         Ok(())
     }
     fn send_to_client(&self, client_id: ClientId, msg: ServerToClientMsg) -> Result<()> {
-        log::debug!("Sending message {} to client {}", &msg, &client_id);
         let err_context = || format!("failed to send message to client {client_id}");
 
         if let Some(sender) = self

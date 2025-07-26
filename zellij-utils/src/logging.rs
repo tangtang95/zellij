@@ -9,6 +9,18 @@ use std::{
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
 
+#[cfg(windows)]
+use std::sync::{Arc, RwLock};
+
+#[cfg(windows)]
+use winptyrs::PTY;
+
+#[cfg(windows)]
+#[derive(Clone)]
+pub struct WinPtyReference {
+    pub pty: Arc<RwLock<PTY>>,
+}
+
 use log::LevelFilter;
 
 use log4rs::append::rolling_file::{
@@ -140,10 +152,10 @@ pub fn debug_to_file(message: &[u8], pid: RawFd) -> io::Result<()> {
     file.write_all(message)
 }
 #[cfg(windows)]
-pub fn debug_to_file(message: &[u8]) -> io::Result<()> {
+pub fn debug_to_file(message: &[u8], pid: u32) -> io::Result<()> {
     let mut path = PathBuf::new();
     path.push(&*ZELLIJ_TMP_LOG_DIR);
-    path.push(format!("zellij-{}.log", "placeholder"));
+    path.push(format!("zellij-{}.log", pid));
 
     let mut file = fs::OpenOptions::new()
         .append(true)

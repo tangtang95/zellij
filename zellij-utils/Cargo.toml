@@ -57,6 +57,7 @@ notify = { workspace = true }
 tokio = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
+winpty-rs = "0.3.13"
 winapi = { version = "0.3.9", features = ["winbase", "ioapiset"] }
 
 [target.'cfg(not(windows))'.dependencies]

@@ -8,6 +8,7 @@ pub mod old_config_converter;
 mod stdin_ansi_parser;
 mod stdin_handler;
 #[cfg(feature = "web_server_capability")]
+#[cfg(unix)]
 pub mod web_client;
 
 use log::info;
@@ -642,7 +643,7 @@ pub fn start_client(
             },
             ClientInstruction::QueryTerminalSize => {
                 os_input.send_to_server(ClientToServerMsg::TerminalResize(
-                    os_input.get_terminal_size_using_fd(0),
+                    os_input.get_terminal_size(os_input_output::HandleType::Stdin),
                 ));
             },
             ClientInstruction::WriteConfigToDisk { config } => {
@@ -749,9 +750,11 @@ pub fn start_server_detached(
         },
     };
 
+    // TODO: Windows compatibility: Change ipc pipe to something cross platform instead of file
     let create_ipc_pipe = || -> std::path::PathBuf {
         let mut sock_dir = ZELLIJ_SOCK_DIR.clone();
         std::fs::create_dir_all(&sock_dir).unwrap();
+        #[cfg(unix)]
         set_permissions(&sock_dir, 0o700).unwrap();
         sock_dir.push(envs::get_session_name().unwrap());
         sock_dir

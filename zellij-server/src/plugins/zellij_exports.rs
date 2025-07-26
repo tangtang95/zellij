@@ -1894,6 +1894,7 @@ fn kill_sessions(session_names: Vec<String>) {
         let path = &*ZELLIJ_SOCK_DIR.join(&session_name);
         match LocalSocketStream::connect(path) {
             Ok(stream) => {
+                #[cfg(unix)] // TODO: windows
                 let _ = IpcSenderWithContext::new(stream).send(ClientToServerMsg::KillSession);
             },
             Err(e) => {
