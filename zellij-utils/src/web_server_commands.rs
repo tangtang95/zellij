@@ -5,6 +5,8 @@ use interprocess::local_socket::LocalSocketStream;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, BufWriter, Write};
+
+#[cfg(unix)]
 use std::os::unix::fs::FileTypeExt;
 
 pub fn shutdown_all_webserver_instances() -> Result<()> {
@@ -19,6 +21,7 @@ pub fn shutdown_all_webserver_instances() -> Result<()> {
                 let metadata = entry.metadata()?;
                 let file_type = metadata.file_type();
 
+                #[cfg(unix)] // TODO: windows
                 if file_type.is_socket() {
                     match create_webserver_sender(path.to_str().unwrap_or("")) {
                         Ok(mut sender) => {

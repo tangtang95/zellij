@@ -13,8 +13,6 @@ use interprocess::local_socket::LocalSocketStream;
 use std::collections::HashMap;
 use std::fs::DirEntry;
 use std::iter::empty;
-use suggest::Suggest;
-use std::collections::HashMap;
 #[cfg(unix)]
 use std::os::unix::fs::FileTypeExt;
 use std::time::{Duration, SystemTime};
@@ -26,6 +24,7 @@ pub fn get_sessions() -> Result<Vec<(String, Duration)>, io::ErrorKind> {
         Ok(files) => {
             let mut sessions = Vec::new();
             files.for_each(|file| {
+                #[cfg(unix)]
                 if let Ok(file) = file {
                     let file_name = file.file_name().into_string().unwrap();
                     let ctime = std::fs::metadata(&file.path())
@@ -38,7 +37,7 @@ pub fn get_sessions() -> Result<Vec<(String, Duration)>, io::ErrorKind> {
                         sessions.push((file_name, duration));
                     }
                 }
-                // TODO windows
+                // TODO: windows
             });
             Ok(sessions)
         },
@@ -72,6 +71,7 @@ fn iter_sessions() -> Result<Box<dyn Iterator<Item = DirEntry>>, io::Error> {
     }
 }
 
+#[cfg(unix)]
 fn is_socket(file: &DirEntry) -> io::Result<bool> {
     zellij_utils::is_socket(file)
 }
@@ -161,6 +161,7 @@ pub fn get_sessions_sorted_by_mtime() -> anyhow::Result<Vec<String>> {
     match fs::read_dir(&*ZELLIJ_SOCK_DIR) {
         Ok(files) => {
             let mut sessions_with_mtime: Vec<(String, SystemTime)> = Vec::new();
+            #[cfg(unix)] // TODO: windows
             for file in files {
                 let file = file;
                 let file_name = file.file_name().into_string().unwrap();
@@ -181,7 +182,8 @@ pub fn get_sessions_sorted_by_mtime() -> anyhow::Result<Vec<String>> {
 
 fn assert_socket(name: &str) -> bool {
     let path = &*ZELLIJ_SOCK_DIR.join(name);
-    match IpcSocketStream::connect(path) {
+    #[cfg(unix)] // TODO: windows
+    match LocalSocketStream::connect(path) {
         Ok(stream) => {
             let mut receiver = IpcReceiverWithContext::new(stream);
             let mut sender = receiver.get_sender();
@@ -201,6 +203,7 @@ fn assert_socket(name: &str) -> bool {
         },
         Err(_) => false,
     }
+    return false
 }
 
 pub fn print_sessions(
@@ -286,7 +289,8 @@ pub fn get_active_session() -> ActiveSession {
 
 pub fn kill_session(name: &str) {
     let path = &*ZELLIJ_SOCK_DIR.join(name);
-    match IpcSocketStream::connect(path) {
+    #[cfg(unix)] // TODO: windows
+    match LocalSocketStream::connect(path) {
         Ok(stream) => {
             let _ = IpcSenderWithContext::new(stream).send(ClientToServerMsg::KillSession);
         },
@@ -300,7 +304,8 @@ pub fn kill_session(name: &str) {
 pub fn delete_session(name: &str, force: bool) {
     if force {
         let path = &*ZELLIJ_SOCK_DIR.join(name);
-        let _ = IpcSocketStream::connect(path).map(|stream| {
+        #[cfg(unix)] // TODO: windows
+        let _ = LocalSocketStream::connect(path).map(|stream| {
             IpcSenderWithContext::new(stream)
                 .send(ClientToServerMsg::KillSession)
                 .ok();

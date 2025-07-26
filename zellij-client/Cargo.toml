@@ -20,12 +20,11 @@ time = { version = "0.3", optional = true }
 tower-http = { version = "0.6.4", features = ["cors"], optional = true }
 
 anyhow = { workspace = true }
-daemonize = { workspace = true }
 interprocess = { workspace = true }
 lazy_static = { workspace = true }
 libc = { workspace = true }
 log = { workspace = true }
-mio = { version = "0.7.11", default-features = false, features = ['os-ext'] }
+mio = { version = "1.0.4", default-features = false, features = ['os-ext'] }
 nix = { workspace = true }
 notify = { workspace = true }
 rmp-serde = { workspace = true }
@@ -41,6 +40,9 @@ include_dir = { workspace = true }
 zellij-utils = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+daemonize = { workspace = true }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.52.0"
