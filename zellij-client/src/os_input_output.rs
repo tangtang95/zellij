@@ -195,6 +195,8 @@ pub trait ClientOsApi: Send + Sync + std::fmt::Debug {
     /// [cooked mode](https://en.wikipedia.org/wiki/Terminal_mode).
     #[cfg(unix)]
     fn unset_raw_mode(&self, fd: RawFd) -> Result<(), nix::Error>;
+    #[cfg(windows)]
+    fn unset_raw_mode(&self, fd: u32) -> Result<(), ()>; // TODO: wrap nix::Error
     /// Returns the writer that allows writing to standard output.
     fn get_stdout_writer(&self) -> Box<dyn io::Write>;
     /// Returns a BufReader that allows to read from STDIN line by line, also locks STDIN
@@ -262,6 +264,10 @@ impl ClientOsApi for ClientOsInputOutput {
                 Ok(())
             },
         }
+    }
+    #[cfg(windows)]
+    fn unset_raw_mode(&self, _: u32) -> Result<(), ()> {
+        Ok(())
     }
     fn box_clone(&self) -> Box<dyn ClientOsApi> {
         Box::new((*self).clone())

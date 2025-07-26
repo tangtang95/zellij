@@ -183,7 +183,9 @@ mod windows_only {
 
     use lazy_static::lazy_static;
 
-    use crate::{envs, shared::set_permissions};
+    use crate::envs;
+
+    pub use crate::shared::set_permissions;
 
     fn get_username() -> String {
         use std::ptr;

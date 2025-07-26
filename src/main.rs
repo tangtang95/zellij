@@ -17,6 +17,7 @@ fn main() {
     configure_logger();
     create_config_and_cache_folders();
     let opts = CliArgs::parse();
+
     {
         let config = Config::try_from(&opts).ok();
         if let Some(Command::Sessions(Sessions::Action(cli_action))) = opts.command {
