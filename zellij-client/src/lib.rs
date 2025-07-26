@@ -8,7 +8,6 @@ pub mod old_config_converter;
 mod stdin_ansi_parser;
 mod stdin_handler;
 #[cfg(feature = "web_server_capability")]
-#[cfg(unix)]
 pub mod web_client;
 
 use log::info;

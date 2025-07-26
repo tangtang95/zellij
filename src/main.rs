@@ -229,8 +229,6 @@ fn main() {
         opts.layout = Some(layout_for_new_session.clone());
         commands::start_client(opts);
     } else if let Some(Command::Web(web_opts)) = &opts.command {
-        #[cfg(unix)]
-        #[cfg(feature = "web_server_capability")]
         if web_opts.get_start() {
             let daemonize = web_opts.daemonize;
             commands::start_web_server(
