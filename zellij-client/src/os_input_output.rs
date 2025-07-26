@@ -1,50 +1,48 @@
 use anyhow::{Context, Result};
 use interprocess;
-use libc;
-use nix;
-use signal_hook;
 use zellij_utils::pane_size::Size;
-use zellij_utils::ipc::IpcSocketStream;
-use zellij_utils::windows_utils::named_pipe;
 
-use interprocess::local_socket::LocalSocketStream;
 
 use mio::{Events, Interest, Poll, Token};
 
-#[cfg(not(windows))]
-use mio::unix::SourceFd;
-#[cfg(windows)]
-use mio::windows::NamedPipe;
-#[cfg(not(windows))]
-use nix::{pty::Winsize, sys::termios};
 #[cfg(unix)]
-use signal_hook::{consts::signal::*, iterator::Signals};
+use ::{
+    libc,
+    nix,
+    signal_hook,
+    interprocess::local_socket::LocalSocketStream,
+    mio::unix::SourceFd,
+    nix::{pty::Winsize, sys::termios},
+    signal_hook::{consts::signal::*, iterator::Signals},
+    std::os::unix::io::RawFd,
+};
+
+#[cfg(windows)]
+use ::{
+    mio::windows::NamedPipe,
+    std::os::windows::io::{AsHandle, AsRawHandle, FromRawHandle, RawHandle},
+    windows_sys::Win32::{
+        Foundation::INVALID_HANDLE_VALUE,
+        System::Console::{
+            GetConsoleMode, GetConsoleScreenBufferInfo, GetStdHandle, ReadConsoleInputA,
+            SetConsoleMode, CONSOLE_SCREEN_BUFFER_INFO, COORD, FOCUS_EVENT, FOCUS_EVENT_RECORD,
+            INPUT_RECORD, INPUT_RECORD_0, SMALL_RECT,
+        },
+    },
+    zellij_utils::ipc::IpcSocketStream,
+    zellij_utils::windows_utils::named_pipe,
+};
 use std::io::prelude::*;
 use std::io::IsTerminal;
-#[cfg(not(windows))]
-use std::os::unix::io::RawFd;
-#[cfg(windows)]
-use std::os::windows::io::{AsHandle, AsRawHandle, FromRawHandle, RawHandle};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex, TryLockError};
-use std::{io, process, thread, time};
-#[cfg(windows)]
-use windows_sys::Win32::{
-    Foundation::INVALID_HANDLE_VALUE,
-    System::Console::{
-        GetConsoleMode, GetConsoleScreenBufferInfo, GetStdHandle, ReadConsoleInputA,
-        SetConsoleMode, CONSOLE_SCREEN_BUFFER_INFO, COORD, FOCUS_EVENT, FOCUS_EVENT_RECORD,
-        INPUT_RECORD, INPUT_RECORD_0, SMALL_RECT,
-    },
-};
+use std::{io, thread, time};
 use zellij_utils::{
     data::Palette,
     errors::ErrorContext,
     ipc::{ClientToServerMsg, IpcReceiverWithContext, IpcSenderWithContext, ServerToClientMsg},
     shared::default_palette,
 };
-#[cfg(not(windows))]
-use zellij_utils::{libc, nix};
 
 #[cfg(not(windows))]
 const SIGWINCH_CB_THROTTLE_DURATION: time::Duration = time::Duration::from_millis(50);
@@ -466,6 +464,26 @@ impl ClientOsApi for ClientOsInputOutput {
             }
         }
     }
+    #[cfg(unix)]
+    fn connect_to_server(&self, path: &Path) {
+        let socket;
+        loop {
+            match LocalSocketStream::connect(path) {
+                Ok(sock) => {
+                    socket = sock;
+                    break;
+                },
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                },
+            }
+        }
+        let sender = IpcSenderWithContext::new(socket);
+        let receiver = sender.get_receiver();
+        *self.send_instructions_to_server.lock().unwrap() = Some(sender);
+        *self.receive_instructions_from_server.lock().unwrap() = Some(receiver);
+    }
+    #[cfg(windows)]
     fn connect_to_server(&self, path: &Path) {
         let socket;
         loop {
@@ -647,10 +665,7 @@ impl StdinPoller {
 impl Default for StdinPoller {
     #[cfg(unix)]
     fn default() -> Self {
-        #[cfg(unix)]
         let stdin = 0;
-
-        #[cfg(unix)]
         let mut stdin_fd = SourceFd(&stdin);
         let events = Events::with_capacity(128);
         let poll = Poll::new().unwrap();

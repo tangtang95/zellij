@@ -1889,12 +1889,29 @@ fn disconnect_other_clients(env: &PluginEnv) {
         .context("failed to send disconnect other clients instruction");
 }
 
+#[cfg(unix)]
 fn kill_sessions(session_names: Vec<String>) {
     for session_name in session_names {
         let path = &*ZELLIJ_SOCK_DIR.join(&session_name);
         match LocalSocketStream::connect(path) {
             Ok(stream) => {
-                #[cfg(unix)] // TODO: windows
+                let _ = IpcSenderWithContext::new(stream).send(ClientToServerMsg::KillSession);
+            },
+            Err(e) => {
+                log::error!("Failed to kill session {}: {:?}", session_name, e);
+            },
+        };
+    }
+}
+
+#[cfg(windows)] // TODO: wrap LocalSocketStream
+fn kill_sessions(session_names: Vec<String>) {
+    use zellij_utils::ipc::IpcSocketStream;
+
+    for session_name in session_names {
+        let path = &*ZELLIJ_SOCK_DIR.join(&session_name);
+        match IpcSocketStream::connect(path) {
+            Ok(stream) => {
                 let _ = IpcSenderWithContext::new(stream).send(ClientToServerMsg::KillSession);
             },
             Err(e) => {

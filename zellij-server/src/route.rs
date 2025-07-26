@@ -1227,7 +1227,7 @@ pub(crate) fn route_thread_main(
                 }
             },
             None => {
-                log::error!("Error receiving Message from client, logging client out.");
+                log::error!("Received empty message from client, logging client out.");
                 let _ = os_input.send_to_client(
                     client_id,
                     ServerToClientMsg::Exit(ExitReason::Error(
@@ -1239,6 +1239,5 @@ pub(crate) fn route_thread_main(
             },
         }
     }
-    log::info!("Terminating server_router");
     Ok(())
 }

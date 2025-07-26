@@ -32,13 +32,11 @@ pub mod sessions;
 #[cfg(all(not(target_family = "wasm"), feature = "web_server_capability"))]
 pub mod web_authentication_tokens;
 #[cfg(all(not(target_family = "wasm"), feature = "web_server_capability"))]
+#[cfg(unix)]
 pub mod web_server_commands;
 
 // TODO(hartan): Remove this re-export for the next minor release.
 pub use ::prost;
-
-#[cfg(target_family = "unix")]
-pub use ::{libc, nix};
 
 #[cfg(windows)]
 pub fn is_socket(file: &std::fs::DirEntry) -> std::io::Result<bool> {
