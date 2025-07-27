@@ -118,23 +118,17 @@ pub(crate) fn get_terminal_size(handle_type: HandleType) -> Size {
 #[cfg(windows)]
 pub(crate) fn get_terminal_size(handle_type: HandleType) -> Size {
     use std::mem;
-    // TODO: handle other handle types, only stdout is supported for now
 
     let handle_type = match handle_type {
-        HandleType::Stdin => windows_sys::Win32::System::Console::STD_INPUT_HANDLE,
-        HandleType::Stdout => windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE,
-        HandleType::Stderr => windows_sys::Win32::System::Console::STD_ERROR_HANDLE,
+        HandleType::Stdin
+        | HandleType::Stdout
+        | HandleType::Stderr => windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE,
         _ => windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE,
     };
 
     let default_size = Size { rows: 24, cols: 80 };
 
-    // get raw windows handle
-    let handle = unsafe { GetStdHandle(handle_type) as RawHandle };
-
-    // convert between windows_sys::Win32::Foundation::HANDLE and std::os::windows::raw::HANDLE
-    let handle = handle as windows_sys::Win32::Foundation::HANDLE;
-
+    let handle = unsafe { GetStdHandle(handle_type) };
     if handle == INVALID_HANDLE_VALUE {
         return default_size;
     }

@@ -284,7 +284,7 @@ pub fn start_client(
         .theme_config(config_options.theme.as_ref())
         .unwrap_or_else(|| os_input.load_palette().into());
 
-    let full_screen_ws = os_input.get_terminal_size(os_input_output::HandleType::Stdout);
+    let full_screen_ws = os_input.get_terminal_size(os_input_output::HandleType::Stdin);
 
     let client_attributes = ClientAttributes {
         size: full_screen_ws,
