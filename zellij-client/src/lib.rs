@@ -375,16 +375,7 @@ pub fn start_client(
 
     let mut command_is_executing = CommandIsExecuting::new();
 
-    os_input.set_raw_mode(
-        windows_sys::Win32::System::Console::STD_INPUT_HANDLE,
-        ENABLE_VIRTUAL_TERMINAL_INPUT,
-        ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT,
-    );
-    os_input.set_raw_mode(
-        windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE,
-        ENABLE_VIRTUAL_TERMINAL_PROCESSING,
-        0,
-    ); // & DISABLE_NEWLINE_AUTO_RETURN);
+    os_input.set_raw_mode(0);
     let _ = os_input
         .get_stdout_writer()
         .write(bracketed_paste.as_bytes())

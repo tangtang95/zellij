@@ -178,7 +178,7 @@ pub trait ClientOsApi: Send + Sync + std::fmt::Debug {
     #[cfg(unix)]
     fn set_raw_mode(&mut self, fd: RawFd);
     #[cfg(windows)]
-    fn set_raw_mode(&mut self, handle_type: u32, enable_mode: u32, disable_mode: u32);
+    fn set_raw_mode(&mut self, handle_type: u32);
     /// Set the terminal associated to file descriptor `fd` to
     /// [cooked mode](https://en.wikipedia.org/wiki/Terminal_mode).
     #[cfg(unix)]
@@ -228,16 +228,24 @@ impl ClientOsApi for ClientOsInputOutput {
     }
 
     #[cfg(windows)]
-    fn set_raw_mode(&mut self, handle: u32, enable_mode: u32, disable_mode: u32) {
-        use windows_sys::Win32::System::Console::{SetConsoleCP, SetConsoleOutputCP};
+    fn set_raw_mode(&mut self, handle: u32) {
+        use windows_sys::Win32::System::Console::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, ENABLE_VIRTUAL_TERMINAL_INPUT, ENABLE_VIRTUAL_TERMINAL_PROCESSING};
 
-        let mut consolemode = 0 as u32;
-        let fd = unsafe { GetStdHandle(handle) };
-        unsafe { GetConsoleMode(fd, &mut consolemode) };
-        consolemode = (consolemode & !disable_mode) | enable_mode;
-        unsafe { SetConsoleMode(fd, consolemode) };
-        unsafe { SetConsoleCP(65001) }; // Set Input CP to UTF8 (https://learn.microsoft.com/de-de/windows/win32/intl/code-page-identifiers)
-        unsafe { SetConsoleOutputCP(65001) };
+        let _ = match handle {
+            0 => { // stdin
+                edit_console_mode(
+                    handle,
+                    ENABLE_VIRTUAL_TERMINAL_INPUT,
+                    ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT)
+            }
+            1 => { // stdout
+                edit_console_mode(
+                    handle,
+                    ENABLE_VIRTUAL_TERMINAL_PROCESSING,
+                    0)
+            }
+            _ => Ok(())
+        };
     }
 
     #[cfg(unix)]
@@ -254,8 +262,24 @@ impl ClientOsApi for ClientOsInputOutput {
         }
     }
     #[cfg(windows)]
-    fn unset_raw_mode(&self, _: u32) -> Result<(), ()> {
-        Ok(())
+    fn unset_raw_mode(&self, handle: u32) -> Result<(), ()> {
+        use windows_sys::Win32::System::Console::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, ENABLE_VIRTUAL_TERMINAL_INPUT, ENABLE_VIRTUAL_TERMINAL_PROCESSING};
+
+        match handle {
+            0 => { // stdin
+                edit_console_mode(
+                    handle,
+                    ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT,
+                    ENABLE_VIRTUAL_TERMINAL_INPUT)
+            }
+            1 => { // stdout
+                edit_console_mode(
+                    handle,
+                    0,
+                    ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+            }
+            _ => Ok(())
+        }
     }
     fn box_clone(&self) -> Box<dyn ClientOsApi> {
         Box::new((*self).clone())
@@ -520,6 +544,28 @@ impl Clone for Box<dyn ClientOsApi> {
         self.box_clone()
     }
 }
+
+#[cfg(windows)]
+fn edit_console_mode(handle: u32, enable_mode: u32, disable_mode: u32) -> Result<(), ()> {
+    use windows_sys::Win32::System::Console::{ENABLE_ECHO_INPUT, ENABLE_LINE_INPUT, ENABLE_PROCESSED_INPUT, ENABLE_VIRTUAL_TERMINAL_INPUT, ENABLE_VIRTUAL_TERMINAL_PROCESSING};
+    // use windows_sys::Win32::System::Console::{SetConsoleCP, SetConsoleOutputCP};
+
+    let win_handle = match handle {
+        0 => windows_sys::Win32::System::Console::STD_INPUT_HANDLE,
+        1 => windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE,
+        _ => windows_sys::Win32::System::Console::STD_INPUT_HANDLE,
+    };
+    let fd = unsafe { GetStdHandle(win_handle) };
+    let mut mode = 0u32;
+    unsafe { GetConsoleMode(fd, &mut mode) };
+    mode = (mode & !disable_mode) | enable_mode;
+    unsafe { SetConsoleMode(fd, mode) };
+
+    // unsafe { SetConsoleCP(65001) }; // Set Input CP to UTF8 (https://learn.microsoft.com/de-de/windows/win32/intl/code-page-identifiers)
+    // unsafe { SetConsoleOutputCP(65001) };
+    Ok(())
+}
+
 #[cfg(unix)]
 pub fn get_client_os_input() -> Result<ClientOsInputOutput, nix::Error> {
     let current_termios = termios::tcgetattr(0).ok();
