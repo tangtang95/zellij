@@ -6,7 +6,6 @@ use crate::pty::{ClientTabIndexOrPaneId, NewPanePlacement, PtyInstruction};
 use crate::route::route_action;
 use crate::ServerInstruction;
 use async_std::task;
-use interprocess::local_socket::LocalSocketStream;
 use log::warn;
 use serde::Serialize;
 use std::{
@@ -24,7 +23,7 @@ use zellij_utils::data::{
     MessageToPlugin, OriginatingPlugin, PermissionStatus, PermissionType, PluginPermission,
 };
 use zellij_utils::input::permission::PermissionCache;
-use zellij_utils::ipc::{ClientToServerMsg, IpcSenderWithContext};
+use zellij_utils::ipc::{ClientToServerMsg, IpcSenderWithContext, IpcSocketStream};
 #[cfg(feature = "web_server_capability")]
 use zellij_utils::web_authentication_tokens::{
     create_token, list_tokens, rename_token, revoke_all_tokens, revoke_token,
@@ -1889,25 +1888,7 @@ fn disconnect_other_clients(env: &PluginEnv) {
         .context("failed to send disconnect other clients instruction");
 }
 
-#[cfg(unix)]
 fn kill_sessions(session_names: Vec<String>) {
-    for session_name in session_names {
-        let path = &*ZELLIJ_SOCK_DIR.join(&session_name);
-        match LocalSocketStream::connect(path) {
-            Ok(stream) => {
-                let _ = IpcSenderWithContext::new(stream).send(ClientToServerMsg::KillSession);
-            },
-            Err(e) => {
-                log::error!("Failed to kill session {}: {:?}", session_name, e);
-            },
-        };
-    }
-}
-
-#[cfg(windows)] // TODO: wrap LocalSocketStream
-fn kill_sessions(session_names: Vec<String>) {
-    use zellij_utils::ipc::IpcSocketStream;
-
     for session_name in session_names {
         let path = &*ZELLIJ_SOCK_DIR.join(&session_name);
         match IpcSocketStream::connect(path) {

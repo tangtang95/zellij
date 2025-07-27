@@ -6,7 +6,6 @@ use crate::{
 };
 use anyhow::{self, Context};
 use humantime::format_duration;
-use interprocess::local_socket::LocalSocketStream;
 use std::collections::HashMap;
 use std::fs::DirEntry;
 use std::iter::empty;

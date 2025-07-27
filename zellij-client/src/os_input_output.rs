@@ -10,7 +10,6 @@ use ::{
     libc,
     nix,
     signal_hook,
-    interprocess::local_socket::LocalSocketStream,
     mio::unix::SourceFd,
     nix::{pty::Winsize, sys::termios},
     signal_hook::{consts::signal::*, iterator::Signals},
@@ -464,26 +463,6 @@ impl ClientOsApi for ClientOsInputOutput {
             }
         }
     }
-    #[cfg(unix)]
-    fn connect_to_server(&self, path: &Path) {
-        let socket;
-        loop {
-            match LocalSocketStream::connect(path) {
-                Ok(sock) => {
-                    socket = sock;
-                    break;
-                },
-                Err(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                },
-            }
-        }
-        let sender = IpcSenderWithContext::new(socket);
-        let receiver = sender.get_receiver();
-        *self.send_instructions_to_server.lock().unwrap() = Some(sender);
-        *self.receive_instructions_from_server.lock().unwrap() = Some(receiver);
-    }
-    #[cfg(windows)]
     fn connect_to_server(&self, path: &Path) {
         let socket;
         loop {
