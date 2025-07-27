@@ -5,4 +5,3 @@ xtask = "run --package xtask --"
 x = "xtask"
 q = "x run --quick-run"
 make = "xtask deprecated"
-
