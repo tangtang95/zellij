@@ -120,6 +120,10 @@ pub fn run(sh: &Shell, mut flags: flags::Run) -> anyhow::Result<()> {
         "dev-opt"
     };
 
+    let mut envs = Vec::new();
+    // TODO: apply envs only for windows
+    envs.push(("RUSTFLAGS", r"-C link-arg=/STACK:8000000"));
+
     if let Some(ref data_dir) = flags.data_dir {
         let data_dir = sh.current_dir().join(data_dir);
         let features = if flags.no_web {
@@ -138,6 +142,7 @@ pub fn run(sh: &Shell, mut flags: flags::Run) -> anyhow::Result<()> {
                     .args(["--profile", profile])
                     .args(["--", "--data-dir", &format!("{}", data_dir.display())])
                     .args(&flags.args)
+                    .envs(envs.clone())
                     .run()
                     .map_err(anyhow::Error::new)
             })
@@ -171,6 +176,7 @@ pub fn run(sh: &Shell, mut flags: flags::Run) -> anyhow::Result<()> {
                         cmd.args(["--profile", profile])
                             .args(["--"])
                             .args(&flags.args)
+                            .envs(envs.clone())
                             .run()
                             .map_err(anyhow::Error::new)
                     },
@@ -181,6 +187,7 @@ pub fn run(sh: &Shell, mut flags: flags::Run) -> anyhow::Result<()> {
                             .args(["--profile", profile])
                             .args(["--"])
                             .args(&flags.args)
+                            .envs(envs.clone())
                             .run()
                             .map_err(anyhow::Error::new)
                     },
@@ -191,6 +198,7 @@ pub fn run(sh: &Shell, mut flags: flags::Run) -> anyhow::Result<()> {
                     .args(["--profile", profile])
                     .args(["--"])
                     .args(&flags.args)
+                    .envs(envs.clone())
                     .run()
                     .map_err(anyhow::Error::new)
             }
