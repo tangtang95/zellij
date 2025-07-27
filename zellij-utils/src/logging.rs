@@ -107,7 +107,7 @@ pub fn configure_logger() {
         .build(
             Root::builder()
                 .appender("logFile")
-                .build(LevelFilter::Debug),
+                .build(LevelFilter::Info),
         )
         .unwrap();
 

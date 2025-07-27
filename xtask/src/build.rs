@@ -190,9 +190,3 @@ fn mandown(_sh: &Shell) -> anyhow::Result<PathBuf> {
         },
     }
 }
-
-fn is_windows_target() -> bool {
-    std::env::var("TARGET")
-        .map(|target| target.contains("windows"))
-        .unwrap_or(false)
-}

@@ -117,7 +117,9 @@ pub(crate) fn get_terminal_size(handle_type: HandleType) -> Size {
 
 #[cfg(windows)]
 pub(crate) fn get_terminal_size(handle_type: HandleType) -> Size {
+    use std::mem;
     // TODO: handle other handle types, only stdout is supported for now
+
     let handle_type = match handle_type {
         HandleType::Stdin => windows_sys::Win32::System::Console::STD_INPUT_HANDLE,
         HandleType::Stdout => windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE,
@@ -138,18 +140,7 @@ pub(crate) fn get_terminal_size(handle_type: HandleType) -> Size {
     }
 
     let zc = COORD { X: 0, Y: 0 };
-    let mut csbi = CONSOLE_SCREEN_BUFFER_INFO {
-        dwSize: zc,
-        dwCursorPosition: zc,
-        wAttributes: 0,
-        srWindow: SMALL_RECT {
-            Left: 0,
-            Top: 0,
-            Right: 0,
-            Bottom: 0,
-        },
-        dwMaximumWindowSize: zc,
-    };
+    let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = unsafe { mem::zeroed() };
 
     if unsafe { GetConsoleScreenBufferInfo(handle, &mut csbi) } == 0 {
         return default_size;

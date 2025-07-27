@@ -17,9 +17,6 @@ use zellij_utils::{
     }, shared::default_palette
 };
 
-#[cfg(windows)]
-use zellij_utils::logging::WinPtyReference;
-
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     env,
@@ -33,31 +30,30 @@ use std::{
 pub use async_trait::async_trait;
 
 #[cfg(unix)]
-use async_std::os::unix::io::FromRawFd;
-#[cfg(unix)]
-pub use nix::unistd::Pid;
-#[cfg(unix)]
-use nix::{
-    pty::{openpty, OpenptyResult, Winsize},
-    sys::{
-        signal::{kill, Signal},
-        termios,
+use ::{
+    async_std::os::unix::io::FromRawFd,
+    nix::{
+        pty::{openpty, OpenptyResult, Winsize},
+        sys::{
+            signal::{kill, Signal},
+            termios,
+        },
+        unistd,
     },
-    unistd,
+    std::os::unix::{io::RawFd, process::CommandExt},
 };
 #[cfg(unix)]
-use std::os::unix::{io::RawFd, process::CommandExt};
-#[cfg(unix)]
-use zellij_utils::{libc, nix};
+pub use nix::unistd::Pid;
 
 #[cfg(windows)]
-use std::thread;
+use ::{
+    std::thread,
+    winptyrs::{AgentConfig, PTYArgs, PTY},
+    std::io::Error,
+    zellij_utils::logging::WinPtyReference,
+};
 #[cfg(windows)]
 pub use sysinfo::{Pid, Signal};
-#[cfg(windows)]
-use winptyrs::{AgentConfig, PTYArgs, PTY};
-#[cfg(windows)]
-use std::io::Error;
 
 #[cfg(unix)]
 fn set_terminal_size_using_fd(
